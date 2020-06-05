@@ -1,1 +1,91 @@
 
+    #Email information#
+sender = 'camerarasspi@gmail.com'
+senderPass = 'ykzogjcpjskmdwip'
+reciver = 'yaljohani@deakin.edu.au'
+    #Libraries#
+import RPi.GPIO as GPIO
+import smtplib
+import uuid
+import smbus
+import time
+import threading
+import webbrowser, os, sys
+
+chrome_path = '/usr/lib/chromium-browser/chromium-browser'
+#initialize the slave address 05
+slave_address = 0x05
+confirm = [0,0,0,0,1]
+bus = smbus.SMBus(1)
+GPIO.setmode(GPIO.BCM)
+
+GPIO.setwarnings(False)
+TR = 14
+Echo = 15
+GPIO.setup(TR, GPIO.OUT)
+GPIO.setup(Echo, GPIO.IN)
+
+def dis_func():# function to calculate the distance
+
+    GPIO.output(TR, True)
+    time.sleep(0.00001)
+    GPIO.output(TR, False) #after 10 milisecond turn the trigger to LOW
+ 
+    while GPIO.input(Echo) == 0:#inisiolize begin time
+        begin = time.time()
+    while GPIO.input(Echo) != 0:#inisiolize end time
+        end = time.time()
+ 
+    return ((end-begin) * 17000)
+
+def writeData(): #function to send data
+    bus.write_i2c_block_data(slave_address,0x01,[0,0,0,0,1])
+    time.sleep(1)
+    return -1
+
+def send(): # function to send email
+    subject = 'WARNING!!!'
+    header = "To: " + reciver + '\n' + 'From: ' + sender + '\n' + 'Subject: ' + subject
+    body = "Argon has detect motion in the garage click on this link to access the camera " + link + '\n' + 'The generated ID is: ' + chatId 
+    s = smtplib.SMTP('smtp.gmail.com', 587)
+    s.ehlo()
+    s.starttls()
+    s.ehlo()
+    s.login(sender,senderPass)
+    s.sendmail(sender, reciver, header + '\n\n' + body)
+    s.quit()
+        
+try:
+    time.sleep(2) #wait for the system to generate
+    
+    while True:
+        dist = dis_func()
+        data = bus.read_byte(slave_address) #to request and read recieved data
+        sending = threading.Thread(target = send)
+        #dist = threading.Thread(target = dis_func)
+        writing = threading.Thread(target = writeData)
+        #dist.start()
+        if data == 1:
+            print('Motion Detected, Email has been sent')
+            chatId = str(uuid.uuid4())
+            link = "http://meet.jit.si/%s" % chatId
+            webbrowser.get(chrome_path).open(link)
+            #send()
+            sending.start()
+            dist.join()
+            while dist > 30:
+                print(dist)
+                time.sleep(1)
+                dist = dis_func()
+                
+            if  (dist<=30):         
+                print('Someone tried to open the door')
+                writing.start()
+                time.sleep(60)
+            else:
+                time.sleep(1)
+        else:
+            print('secure')
+            time.sleep(2)
+except:
+    GPIO.cleanup()
