@@ -1,1 +1,81 @@
 
+#include <blynk.h>
+#define BLYNK_PRINT Serial
+
+#include <Wire.h>
+
+// initialize the address
+#define Address 0x05
+
+int motion = D4; //motion sensor
+int value; // to store motion status
+int send = 0; // to store data that will be sent to raspberry
+int number = 0; // to store received data
+Servo servo_door;  // to control servo motor
+
+// Auth Token for the Blynk App.
+char auth[] = "EK2iXDTKLQwLZWt928S5p0yqjDqUk4W1";
+
+
+void setup() {
+    
+    // initialize argon to be slave
+    Wire.begin(Address);
+    
+    // send and recieve data to raspberry
+    Wire.onRequest(dataToSend);
+    Wire.onReceive(receiveData);
+    
+    pinMode(motion, INPUT);
+    
+  
+    servo_door.attach(D6);   // use D6 pin to control servo
+
+    pinMode(D7, OUTPUT);  // use D7 to output LED value
+   
+    //inisilize blynk
+    Blynk.begin(auth);
+
+}
+
+void loop() {
+    Blynk.run();
+
+   // delay(5000);
+}
+
+//move servo from blynk
+BLYNK_WRITE(V1) // I have used V1 in the blynk app
+{
+    servo_door.write(param.asInt());
+}
+
+
+// sending data function
+// this function is used to notify raspberry when ther is motion in the garage
+void dataToSend(){
+    value = digitalRead(motion);
+    if (value == HIGH){
+        send = 1;
+    }
+    else{
+        send = 0;
+    }
+    Wire.write(send);
+    
+}
+        
+// recieving data function   
+// this function is used to close the door when raspberry says so
+void receiveData(int byteCount){
+    number = Wire.read();
+    if (number == 1)
+       {
+           servo_door.write(100);
+           number = 0;
+       }
+
+}
+
+
+
